@@ -1,0 +1,15 @@
+language: node_js
+node_js:
+- '6'
+script:
+- npm run build
+before_deploy:
+- cd dist
+deploy:
+  provider: npm
+  email: WOOLAN@piratized.se
+  api_key:
+    secure: XIe35X/LSXB2HLkoh1hTaYs42Jd7BmYJp+VIJKqMbhMcJQeKYBZixYpYwc/bXkJd+QqNdaVwXJQm27rucX7349Pa+6vM0eptRFN6FunyGh2lRNKHuTP/C2tjI4C7E9XEfSOaIf2mk4kassOwa2cF7sYyba6cIYWNNf6u6v5FtbQCNZ1vBmDzAjhEi6VhvHJsPdtiFMePSZMlkbPQO8ESYKtb7oA4BtrtGNaozgfz0oUQ1Gap+ilqSHCRsnDtxUsRnCbOBRdYtmhN0TGGoBEkzdu0Bj82TYmDZzQmJG62JChY0JRgl6MALCHvx5MVcTYOyWkw9KvH6WwHjqN1wHQKScL8M5z8iPvgrIqzASAESuPiWIU3bk9Iz+pG03ndGPPw1GGMbBXfG6SyY2PTUirxfRO8Bnqnj0IQ+Kzw61k3ffX0+JL1XDumC+xPF3jGZeF6rF2YxvNAPddTTuFMWdAu7BqHQzJDW+L8B7EFF4djK3ESeTFVVd8Q4M20c8BKFKH0/cp94qMsLLGVwbqVW0TBFzOeRR571cN2N6alME2dgxPCR574IUdD4el1n0R4fJE/wmh+wI/JU/NlWx0nyfSzSBrCgU48WXxthf2yV1JWaIG5d1Mi60LEqXe58VfRxuT9bKxz5btslFqX4yIi+1BrxZxjrmp9LXgKDoK72W1uscc=
+  skip_cleanup: true
+  on:
+    tags: true
