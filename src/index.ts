@@ -1,5 +1,6 @@
 import * as Hapi from 'hapi';
-const inert = require('inert');
+import * as inert from 'inert';
+import * as hbs from 'handlebars';
 const vision = require('vision');
 const swagger = require('hapi-swagger');
 
@@ -15,6 +16,8 @@ export interface IAPIConfig {
     contact?: string | IContact;
     redirect?: boolean;
     security?: ISecurityDefinitions;
+    basePath?: string;
+    documentationPath?: string;
 }
 
 export interface IContact {
@@ -42,9 +45,26 @@ export interface ISecurityScopes {
     [name: string]: string;
 }
 
-export import IPromise = Hapi.IPromise;
-
 export class Swagger extends Hapi.Server {
+    public static extend(target: any, ...sources: any[]) {
+        let source: any;
+
+        for (let i: number = 0; i < sources.length; ++i) {
+            source = sources[i];
+
+            for (let key in source) {
+                if (typeof source[key] === 'object') {
+                    target[key] = this.extend(target[key] || {}, source[key]);
+                } else {
+                    target[key] = source[key];
+                }
+            }
+
+        }
+
+        return target;
+    }
+
     private config: IServerConfig = {
         server: {
             port: 8080
@@ -54,16 +74,18 @@ export class Swagger extends Hapi.Server {
             version: '1.0.0',
             description: 'Serve Swagger API',
             contact: null,
-            redirect: true
+            redirect: true,
+            basePath: '/api',
+            documentationPath: '/apidoc'
         }
     };
     protected routes: () => Hapi.IRouteConfiguration[];
 
     public constructor(config?: IServerConfig) {
         super();
-        (<any> Object).assign(this.config, config); // Temp
+        Swagger.extend(this.config, config);
 
-        if (config.api.contact && typeof this.config.api.contact === 'string') {
+        if (this.config.api.contact && typeof this.config.api.contact === 'string') {
             const pattern = /^([\w -]+)(?: <(.*)>(?: \((.*)\))?)?$/;
             const match = pattern.exec(this.config.api.contact);
 
@@ -85,28 +107,28 @@ export class Swagger extends Hapi.Server {
         super.connection(this.config.server);
     }
 
-    public run() {
+    public run(): Promise<void> {
         return this.setup()
             .then(() => this.init())
             .then(() => this.log(['info', 'swagger'], 'Listen ' + this.info.address + ':' + this.info.port))
             .catch((err) => this.log(['error', 'swagger'], err));
     }
 
-    private init(): Hapi.IPromise<void> {
+    private init(): Promise<void> {
         this.views({
-            engines: { html: require('handlebars') },
+            engines: { html: hbs },
             path: __dirname + '/public'
         });
 
         super.route({
             method: 'GET',
-            path: '/apidoc',
-            handler: (request: Hapi.Request, reply: Hapi.IReply) => reply.view('index.html', { path: 'apidoc/' })
+            path: this.config.api.documentationPath,
+            handler: (request: Hapi.Request, reply: Hapi.IReply) => reply.view('index.html', { path: this.config.api.documentationPath.substr(1) + '/' })
         });
 
         super.route({
             method: 'GET',
-            path: '/apidoc/{path*}',
+            path: `${this.config.api.documentationPath}/{path*}`,
             handler: {
                 directory: {
                     path: __dirname + '/public',
@@ -120,16 +142,30 @@ export class Swagger extends Hapi.Server {
             super.route({
                 method: 'GET',
                 path: '/',
-                handler: (request: Hapi.Request, reply: Hapi.IReply) => reply.redirect('/apidoc')
+                handler: (request: Hapi.Request, reply: Hapi.IReply) => reply.redirect(this.config.api.documentationPath)
             });
         }
 
-        super.route(this.routes());
+        this.route(this.routes());
 
         return super.start();
     }
 
-    private setup(plugins: any[] = []): Hapi.IPromise<void> {
+    public route(options: Hapi.IRouteConfiguration | Hapi.IRouteConfiguration[]): void {
+        if (!Array.isArray(options)) {
+            options = [options];
+        }
+
+        for (let i: number = 0; i < options.length; ++i) {
+            if (options[i].config.tags.indexOf('api') >= 0) {
+                options[i].path = this.config.api.basePath + options[i].path;
+            }
+        }
+
+        return super.route(options);
+    }
+
+    private setup(plugins: any[] = []): Promise<void> {
         const swaggerConfig = {
             register: swagger,
             options: {
@@ -140,8 +176,8 @@ export class Swagger extends Hapi.Server {
                     contact: this.config.api.contact
                 },
                 documentationPage: false,
-                basePath: '/api',
-                jsonPath: '/apidoc/swagger.json',
+                basePath: this.config.api.basePath,
+                jsonPath: `${this.config.api.documentationPath}/swagger.json`,
                 sortEndpoints: 'path',
                 pathPrefixSize: 2,
                 securityDefinitions: this.config.api.security || null
