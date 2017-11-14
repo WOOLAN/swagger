@@ -21,12 +21,12 @@
     "node": ">=6.0.0"
   },
   "peerDependencies": {
-    "hapi": ">=15.0.1"
+    "hapi": "^16.1.1"
   },
   "dependencies": {
     "hapi-swagger": "^7.4.0",
-    "inert": ">=4.0.0",
-    "vision": ">=4.0.0"
+    "inert": "^4.0.0",
+    "vision": "^4.0.0"
   },
   "devDependencies": {
     "@types/handlebars": "^4.0.32",
