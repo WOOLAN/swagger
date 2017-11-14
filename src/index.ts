@@ -1,11 +1,11 @@
 import * as Hapi from 'hapi';
-import * as inert from 'inert';
-import * as hbs from 'handlebars';
+const inert = require('inert');
 const vision = require('vision');
 const swagger = require('hapi-swagger');
 
 export interface IServerConfig {
-    server?: Hapi.IServerConnectionOptions;
+    server?: Hapi.ServerOptions;
+    connection?: Hapi.ServerConnectionOptions;
     api?: IAPIConfig;
 }
 
@@ -66,12 +66,13 @@ export class Swagger extends Hapi.Server {
     }
 
     private config: IServerConfig = {
-        server: {
+        server: {},
+        connection: {
             port: 8080
         },
         api: {
             title: 'Swagger',
-            version: '1.0.0',
+            version: '1.2.0',
             description: 'Serve Swagger API',
             contact: null,
             redirect: true,
@@ -79,10 +80,10 @@ export class Swagger extends Hapi.Server {
             documentationPath: '/apidoc'
         }
     };
-    protected routes: () => Hapi.IRouteConfiguration[];
+    protected routes: () => Hapi.RouteConfiguration[];
 
     public constructor(config?: IServerConfig) {
-        super();
+        super(config.server);
         Swagger.extend(this.config, config);
 
         if (this.config.api.contact && typeof this.config.api.contact === 'string') {
@@ -104,7 +105,7 @@ export class Swagger extends Hapi.Server {
             }
         }
 
-        super.connection(this.config.server);
+        super.connection(this.config.connection);
     }
 
     public run(): Promise<void> {
@@ -114,16 +115,16 @@ export class Swagger extends Hapi.Server {
             .catch((err) => this.log(['error', 'swagger'], err));
     }
 
-    private init(): Promise<void> {
+    private init(): Promise<Error | null> {
         this.views({
-            engines: { html: hbs },
+            engines: { html: require('handlebars') },
             path: __dirname + '/public'
         });
 
         super.route({
             method: 'GET',
             path: this.config.api.documentationPath,
-            handler: (request: Hapi.Request, reply: Hapi.IReply) => reply.view('index.html', { path: this.config.api.documentationPath.substr(1) + '/' })
+            handler: (request: Hapi.Request, reply: Hapi.ReplyNoContinue) => reply.view('index.html', { path: this.config.api.documentationPath.substr(1) + '/' })
         });
 
         super.route({
@@ -142,7 +143,7 @@ export class Swagger extends Hapi.Server {
             super.route({
                 method: 'GET',
                 path: '/',
-                handler: (request: Hapi.Request, reply: Hapi.IReply) => reply.redirect(this.config.api.documentationPath)
+                handler: (request: Hapi.Request, reply: Hapi.ReplyNoContinue) => reply.redirect(this.config.api.documentationPath)
             });
         }
 
@@ -151,13 +152,13 @@ export class Swagger extends Hapi.Server {
         return super.start();
     }
 
-    public route(options: Hapi.IRouteConfiguration | Hapi.IRouteConfiguration[]): void {
+    public route(options: Hapi.RouteConfiguration | Hapi.RouteConfiguration[]): void {
         if (!Array.isArray(options)) {
             options = [options];
         }
 
         for (let i: number = 0; i < options.length; ++i) {
-            if (options[i].config.tags.indexOf('api') >= 0) {
+            if ((options[i].config as Hapi.RouteAdditionalConfigurationOptions).tags.indexOf('api') >= 0) {
                 options[i].path = this.config.api.basePath + options[i].path;
             }
         }
@@ -165,7 +166,7 @@ export class Swagger extends Hapi.Server {
         return super.route(options);
     }
 
-    private setup(plugins: any[] = []): Promise<void> {
+    private setup(plugins: any[] = []): Promise<Error | null> {
         const swaggerConfig = {
             register: swagger,
             options: {
